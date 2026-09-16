@@ -1,0 +1,47 @@
+# Does it typecheck, do the tests pass, does the image boot. Nothing here
+# touches a network, a key or a wallet.
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t toon-checkout:ci .
+      - name: the forwarder boots and serves only the manifest's doors
+        run: |
+          docker run -d --name fwd -p 3700:3700 -e UPSTREAM_API_KEY=ci toon-checkout:ci forwarder
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:3700/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:3700/health | grep -q '"doors":7'
+          curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:3700/nope | grep -q 404
+          docker logs fwd
+      - name: the gate boots in free mode with no payer
+        run: |
+          docker run -d --name gate -p 3701:3701 -e GATE_FREE=1 toon-checkout:ci gate
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:3701/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:3701/v1/describe | grep -q '"doors"'
+          curl -sf 'http://127.0.0.1:3701/v1/quote?door=query_hex' | grep -q 'g.colourmemory.query_hex'
+          docker logs gate
+      - name: routes and keys run from the image
+        run: |
+          docker run --rm toon-checkout:ci routes | grep -c '^\[\[routes\]\]' | grep -q 7
+          mkdir -p /tmp/k && docker run --rm -v /tmp/k:/k toon-checkout:ci keys --data /k/data --secrets /k/secrets | grep -q 'payee'

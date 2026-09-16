@@ -1,0 +1,128 @@
+{
+  "$comment": "Colour Memory (PR Eye Ltd, colourmemory.com) behind a TOON checkout. Prices are in the settlement token's base units: on Base USDC that is micro-USDC, so 30000 = 0.03 USDC. Archive calls are near-free, Intelligence calls are priced per credit. Digby sets the numbers; nothing else in the kit knows about Colour Memory.",
+  "name": "colour-memory",
+  "title": "Colour Memory",
+  "toolPrefix": "colour",
+  "upstream": "https://api.colourmemory.com",
+  "auth": { "header": "X-Api-Key", "env": "UPSTREAM_API_KEY" },
+  "prefix": "g.colourmemory",
+  "doors": [
+    {
+      "id": "query_hex",
+      "method": "POST",
+      "path": "/query/hex",
+      "units": 1000,
+      "title": "Match a hex colour to the archive",
+      "description": "Nearest archive colour to any hex (CIEDE2000). Archive call, near-free. Returns name, archive, primary source, confidence, claim strength, cultural risk and the do_not_say guardrails.",
+      "input": {
+        "type": "object",
+        "required": ["hex"],
+        "properties": {
+          "hex": { "type": "string", "description": "Hex value, e.g. #D4A829" },
+          "n_results": { "type": "integer", "minimum": 1, "maximum": 10, "description": "Number of matches. Default 1, max 10." },
+          "archive": { "type": "string", "description": "Restrict to a named archive." }
+        }
+      }
+    },
+    {
+      "id": "query_conceptual",
+      "method": "POST",
+      "path": "/query/conceptual",
+      "units": 1000,
+      "title": "Search the archive by concept",
+      "description": "Semantic search by mood, concept or culture (\"Ottoman luxury\", \"Victorian grief\"). Archive call, near-free.",
+      "input": {
+        "type": "object",
+        "required": ["query"],
+        "properties": {
+          "query": { "type": "string", "description": "Natural language query" },
+          "n_results": { "type": "integer", "minimum": 1, "maximum": 20, "description": "Default 5, max 20." },
+          "archive": { "type": "string", "description": "Restrict to a named archive." }
+        }
+      }
+    },
+    {
+      "id": "archive_search",
+      "method": "POST",
+      "path": "/archive/search",
+      "units": 1000,
+      "title": "Keyword search across the archives",
+      "description": "Full-text search by name, material, pigment or period. Archive call, near-free.",
+      "input": {
+        "type": "object",
+        "required": ["q"],
+        "properties": {
+          "q": { "type": "string", "description": "Search term" },
+          "archive": { "type": "string", "description": "Restrict to a named archive." },
+          "limit": { "type": "integer", "minimum": 1, "maximum": 50, "description": "Default 10, max 50." }
+        }
+      }
+    },
+    {
+      "id": "accessibility_matrix",
+      "method": "POST",
+      "path": "/accessibility/matrix",
+      "units": 1000,
+      "title": "WCAG matrix for a palette",
+      "description": "WCAG 2.1 contrast ratios for every foreground and background pair in a palette, with grades. Archive call, near-free.",
+      "input": {
+        "type": "object",
+        "required": ["palette"],
+        "properties": {
+          "palette": { "type": "array", "items": { "type": "string" }, "description": "Hex values, e.g. [\"#D4A829\", \"#0A0A0B\"]" }
+        }
+      }
+    },
+    {
+      "id": "brand_collision",
+      "method": "POST",
+      "path": "/brand/collision-check",
+      "units": 30000,
+      "title": "Can this brand own this colour?",
+      "description": "Competitor distance, cultural context and ownership risk for a brand colour in a market. Intelligence call, 1 credit.",
+      "inputUnverified": true,
+      "input": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "hex": { "type": "string", "description": "The brand colour, e.g. #D4A829" },
+          "brand": { "type": "string", "description": "Brand name" },
+          "market": { "type": "string", "description": "Market or sector the brand competes in" }
+        }
+      }
+    },
+    {
+      "id": "ecommerce_copy",
+      "method": "POST",
+      "path": "/ecommerce/product-copy",
+      "units": 30000,
+      "title": "Product copy for a colour",
+      "description": "Product title, short and long description, SEO title, meta description, alt text and an Instagram caption, grounded in archive provenance. Intelligence call, 1 credit.",
+      "inputUnverified": true,
+      "input": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "hex": { "type": "string", "description": "The product colour, e.g. #D4A829" },
+          "product": { "type": "string", "description": "What the product is" }
+        }
+      }
+    },
+    {
+      "id": "brief_forensic",
+      "method": "POST",
+      "path": "/brief/forensic",
+      "units": 90000,
+      "title": "Forensic colour brief",
+      "description": "One call: colour cards, editorial argument, act structure, pull quote, closing line and an image prompt. Intelligence call, 3 credits.",
+      "inputUnverified": true,
+      "input": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "query": { "type": "string", "description": "The brief's subject, concept or period" }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+# Auto-TLS from Let's Encrypt: both hosts must resolve to this box with 80 and
+# 443 open. sslip.io magic DNS works for a first run (e.g. api.1-2-3-4.sslip.io).
+
+# The paid ILP edge: POST /ilp, GET /ilp (self-description), GET /ilp/btp.
+# Plaintext endpoints are refused by peers (CF-18), so TLS here is not optional.
+{$PUBLIC_HOST} {
+	reverse_proxy connector:4000
+}
+
+# The x402 gate, for callers without a channel (Claude through the MCP shim).
+{$GATE_HOST} {
+	encode zstd gzip
+	reverse_proxy gate:3701 {
+		transport http {
+			response_header_timeout 0
+		}
+	}
+}

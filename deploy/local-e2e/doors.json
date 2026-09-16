@@ -1,0 +1,8 @@
+{
+  "name": "e2e", "title": "E2E", "upstream": "http://upstream:3900", "prefix": "g.test",
+  "auth": { "header": "X-Api-Key", "env": "UPSTREAM_API_KEY" },
+  "doors": [
+    { "id": "query_hex", "method": "POST", "path": "/query/hex", "units": 0, "title": "hex", "description": "d" },
+    { "id": "paid", "method": "POST", "path": "/paid", "units": 0, "title": "paid", "description": "d" }
+  ]
+}

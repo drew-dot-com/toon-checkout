@@ -1,0 +1,109 @@
+# toon-checkout: a per-call USDC checkout in front of your API.
+#
+#   cp deploy/.env.example .env   (edit)
+#   bash deploy/first-run.sh      (keys, config, chown)
+#   docker compose -f deploy/docker-compose.yml --env-file .env up -d
+#
+# Four containers. Only Caddy publishes ports; the connector, the forwarder
+# and the gate talk over the compose network. Your API's credential lives in
+# the forwarder alone, and the forwarder is reachable only from the connector.
+name: checkout
+
+x-kit: &kit
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  image: toon-checkout:local
+  restart: unless-stopped
+
+services:
+  connector:
+    # Pinned to an immutable sha tag (the same one the first third-party node
+    # runs). `rust-main` floats and must never be pinned in a deployment.
+    image: ${CONNECTOR_IMAGE:-ghcr.io/toon-protocol/connector:rust-sha-deded9f}
+    platform: linux/amd64
+    command: ['/app/config/connector.toml']
+    volumes:
+      # Keys are chowned 10001:10001 by first-run.sh: the image runs as that uid
+      # and a bind mount keeps host ownership, so a root-owned 0600 key is a
+      # restart loop on "Permission denied".
+      - ../config:/app/config:ro
+      - ../data:/app/data:ro
+      - connector_state:/app/state
+    expose: ['4000']
+    depends_on: [forwarder]
+
+  forwarder:
+    <<: *kit
+    command: ['forwarder']
+    environment:
+      PORT: '3700'
+      DOORS: ${DOORS:-examples/colour-memory/doors.json}
+      UPSTREAM_API_KEY: ${UPSTREAM_API_KEY:?the upstream API key the forwarder adds}
+      MAX_BODY_BYTES: ${MAX_BODY_BYTES:-1048576}
+    expose: ['3700']
+
+  gate:
+    <<: *kit
+    command: ['gate']
+    environment:
+      PORT: '3701'
+      DOORS: ${DOORS:-examples/colour-memory/doors.json}
+      TOON_EDGE: http://connector:4000
+      GATE_URL: https://${GATE_HOST:?public host of the x402 gate}
+      PAY_TO: ${PAY_TO:?Base address the x402 revenue lands on}
+      EVM_PRIVATE_KEY_FILE: /app/secrets/gate-payer.key   # the gate's own TOON payer on Base; first-run.sh generates it
+      BASE_RPC: ${BASE_RPC:-https://base-rpc.publicnode.com}
+      CHANNEL_DEPOSIT: ${CHANNEL_DEPOSIT:-2000000}
+      GATE_MARGIN: ${GATE_MARGIN:-1.2}
+      GATE_FLOOR_USDC: ${GATE_FLOOR_USDC:-0.005}
+      X402_FACILITATOR: ${X402_FACILITATOR:-https://facilitator.payai.network}
+      GATE_HOME: /data/gate
+    volumes:
+      - ../secrets:/app/secrets:ro
+      - gate_data:/data
+    expose: ['3701']
+    depends_on: [connector]
+
+  # Redeems the claims the node holds on chain, on a schedule (nothing on a
+  # connector moves on chain by itself). Dry run unless REDEEM_EXECUTE=1.
+  redeem:
+    <<: *kit
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        while true; do
+          node dist/cli.js redeem || echo "redeem: failed rc=$$?"
+          sleep $$(( $${REDEEM_EVERY_HOURS:-24} * 3600 ))
+        done
+    environment:
+      TOON_EDGE: http://connector:4000
+      OPERATOR_BEARER_FILE: /app/data/operator-bearer-token
+      OPERATOR_WRITE_KEY_FILE: /app/secrets/operator-write.key
+      REDEEM_STATE: /data/redeem-state.json
+      REDEEM_EXECUTE: ${REDEEM_EXECUTE:-0}
+      REDEEM_EVERY_HOURS: ${REDEEM_EVERY_HOURS:-24}
+      REDEEM_MIN_UNITS: ${REDEEM_MIN_UNITS:-100000}
+    volumes:
+      - ../data:/app/data:ro
+      - ../secrets:/app/secrets:ro
+      - redeem_data:/data
+    depends_on: [connector]
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?public host of the connector}
+      GATE_HOST: ${GATE_HOST}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on: [connector, gate]
+
+volumes:
+  connector_state:
+  gate_data:
+  redeem_data:
+  caddy_data:

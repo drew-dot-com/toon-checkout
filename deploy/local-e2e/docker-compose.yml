@@ -1,0 +1,23 @@
+name: checkout-e2e
+services:
+  upstream:
+    image: node:22-bookworm-slim
+    command: ['node', '/upstream.mjs']
+    volumes: ['./upstream.mjs:/upstream.mjs:ro']
+    expose: ['3900']
+  forwarder:
+    image: toon-checkout:local
+    command: ['forwarder']
+    environment: { PORT: '3700', DOORS: /doors.json, UPSTREAM_API_KEY: cm_e2e_secret }
+    volumes: ['./doors.json:/doors.json:ro']
+    expose: ['3700']
+    depends_on: [upstream]
+  connector:
+    image: ghcr.io/toon-protocol/connector:rust-sha-deded9f
+    platform: linux/amd64
+    command: ['/app/config/connector.toml']
+    volumes: ['./config:/app/config:ro', './data:/app/data:ro', 'state:/app/state']
+    ports: ['4400:4000']
+    depends_on: [forwarder]
+volumes:
+  state:

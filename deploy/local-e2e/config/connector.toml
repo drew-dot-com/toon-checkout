@@ -1,0 +1,36 @@
+# Local end-to-end: the smallest configuration that serves (operator-spec §1.2)
+# plus the manifest's doors priced at ZERO, because there is no settlement
+# backend here and a free route takes no claim. What this proves is the
+# delivery path: envelope in, handler_url + target resolution, method/body/
+# headers to the forwarder, the upstream answer riding home on a FULFILL.
+client_edge_addr = "0.0.0.0:4000"
+state_dir = "/app/state"
+
+[node]
+http_endpoint = "http://127.0.0.1:4400/ilp"
+addresses = ["g.test.query_hex", "g.test.paid"]
+
+[signer]
+key_file = "/app/data/signer.key"
+
+[[routes]]
+prefix = "g.test.query_hex"
+handler_url = "http://forwarder:3700/query/hex"
+price = 0
+
+[[routes]]
+prefix = "g.test.paid"
+handler_url = "http://forwarder:3700/paid"
+price = 0
+
+# Base mainnet, read-only at boot (the EVM backend only reads at connect), so the
+# client sees a chain to pick; the free routes above still take no claim.
+[settlement.evm]
+rpc_url = "https://base-rpc.publicnode.com"
+contract_address = "0x61d31e7Fd9a57A0611e29Bd7eB162f15AC8B3427"
+token_address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+decimals = 6
+channel_index_from_block = 50745815
+
+[settlement.evm.key]
+key_file = "/app/data/settlement.key"

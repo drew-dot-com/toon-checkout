@@ -1,0 +1,55 @@
+# The demo half: the same kit on Drew's Hetzner node, pointed at Colour Memory
+# with a dev key, its doors sold under g.drew.colour by the EXISTING edge
+# connector. Joins the node's compose network like anonfetch, gas and lading
+# do: its own compose project, zero changes to the node stack beyond the
+# routes appended to the edge TOML (routes.toml here) and one Caddy site.
+#
+#   docker compose -p colour -f deploy/drew-node/docker-compose.yml --env-file deploy/drew-node/.env up -d --build
+name: colour
+
+x-kit: &kit
+  build:
+    context: ../..
+    dockerfile: Dockerfile
+  image: toon-checkout:local
+  restart: unless-stopped
+  networks: [relay_deploy_net]
+
+services:
+  colour-forwarder:
+    <<: *kit
+    container_name: colour-forwarder
+    command: ['forwarder']
+    environment:
+      PORT: '3700'
+      DOORS: examples/colour-memory/doors.json
+      UPSTREAM_API_KEY: ${UPSTREAM_API_KEY:?Colour Memory dev key}
+    expose: ['3700']
+
+  colour-gate:
+    <<: *kit
+    container_name: colour-gate
+    command: ['gate']
+    environment:
+      PORT: '3701'
+      DOORS: examples/colour-memory/doors.json
+      ROUTE_PREFIX: g.drew.colour
+      TOON_EDGE: ${TOON_EDGE:-https://connector.167-233-221-236.sslip.io}
+      GATE_URL: ${GATE_URL:-https://colour.167-233-221-236.sslip.io}
+      PAY_TO: ${PAY_TO:?Base address the x402 revenue lands on}
+      # The gate pays Drew's edge on Solana, like Lading's gate does (its own keypair, JSON array).
+      SOLANA_KEYPAIR_JSON: ${GATE_SOLANA_KEYPAIR:?the gate's TOON payer}
+      SOLANA_RPC: ${SOLANA_RPC:-https://solana-rpc.publicnode.com}
+      CHANNEL_DEPOSIT: ${CHANNEL_DEPOSIT:-2000000}
+      GATE_MARGIN: ${GATE_MARGIN:-1.2}
+      GATE_FLOOR_USDC: ${GATE_FLOOR_USDC:-0.005}
+      X402_FACILITATOR: ${X402_FACILITATOR:-https://facilitator.payai.network}
+      GATE_HOME: /data/gate
+    volumes: [colour_gate_data:/data]
+    expose: ['3701']
+
+volumes:
+  colour_gate_data:
+networks:
+  relay_deploy_net:
+    external: true

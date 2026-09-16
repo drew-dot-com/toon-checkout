@@ -1,0 +1,10 @@
+# Append to /opt/toon-relay/deploy/Caddyfile (back it up first), then
+# `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+colour.167-233-221-236.sslip.io {
+	encode zstd gzip
+	reverse_proxy colour-gate:3701 {
+		transport http {
+			response_header_timeout 0
+		}
+	}
+}

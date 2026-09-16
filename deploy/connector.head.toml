@@ -1,0 +1,44 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# toon-checkout: the connector in front of your API. This is the head of the
+# file; `toon-checkout routes` appends one [[routes]] per door from doors.json
+# (first-run.sh does both). Every table is deny_unknown_fields: a typo is a
+# boot failure that names it, never a line silently dropped.
+#
+# This node answers for itself at GET /ilp and publishes nothing anywhere
+# (connector ADR 0046): a caller is handed its URL out of band.
+# ═══════════════════════════════════════════════════════════════════════════
+client_edge_addr = "0.0.0.0:4000"
+state_dir = "/app/state"
+
+[node]
+# The facts a container cannot see about itself: the public URL Caddy serves.
+# first-run.sh fills the host in from PUBLIC_HOST in .env.
+http_endpoint = "https://__PUBLIC_HOST__/ilp"
+btp_endpoint = "wss://__PUBLIC_HOST__/ilp/btp"
+__ADDRESSES__
+
+[signer]
+key_file = "/app/data/signer.key"
+
+[operator]
+# Reads take the bearer token; writes (redeem, peer) take an RFC 9421 signature
+# from a key on write_keys. The private half of that key is never on this box's
+# node mount; `toon-checkout redeem` holds it.
+bearer_token_file = "/app/data/operator-bearer-token"
+write_keys_file = "/app/data/operator-write-keys"
+
+# BASE MAINNET (chain id 8453). These are the live TOON deployment's addresses,
+# copied, not chosen: a claim resolves against one deployment, so every node
+# that might accept a claim names the same registry and token.
+[settlement.evm]
+rpc_url = "https://base-rpc.publicnode.com"
+contract_address = "0x61d31e7Fd9a57A0611e29Bd7eB162f15AC8B3427"   # TokenNetworkRegistry
+token_address = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"      # USDC on Base
+decimals = 6
+# The TokenNetwork was created at this block; skip the cold scan from genesis.
+channel_index_from_block = 50745815
+
+[settlement.evm.key]
+key_file = "/app/data/settlement.key"
+
+# ── routes: generated below by `toon-checkout routes` ──────────────────────
